@@ -12,27 +12,25 @@
             font-family: 'Inter', sans-serif;
         }
         .service-box {
-            transition: all 0.3s ease-in-out;
+            transition: box-shadow 0.2s ease-in-out;
             z-index: 10;
-            position: relative;
+            position: absolute;
+            cursor: grab;
+        }
+        .service-box.dragging {
+            cursor: grabbing;
+            z-index: 20;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 2px #3b82f6;
         }
         .instance {
             transition: all 0.3s ease-in-out;
-            width: 1rem;
-            height: 1rem;
+            width: 0.8rem;
+            height: 0.8rem;
         }
-        .instance.busy {
-            background-color: #f59e0b; /* amber-500 */
-        }
-        .instance.idle {
-            background-color: #22c55e; /* green-500 */
-        }
-        .instance.scaling-up {
-            animation: scale-up 0.5s ease-out;
-        }
-        .instance.scaling-down {
-            animation: scale-down 0.5s ease-out;
-        }
+        .instance.busy { background-color: #f59e0b; } /* amber-500 */
+        .instance.idle { background-color: #22c55e; } /* green-500 */
+        .instance.scaling-up { animation: scale-up 0.5s ease-out; }
+        .instance.scaling-down { animation: scale-down 0.5s ease-out; }
         @keyframes scale-up {
             from { transform: scale(0); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
@@ -41,533 +39,615 @@
             from { transform: scale(1); opacity: 1; }
             to { transform: scale(0); opacity: 0; }
         }
-        .log-entry {
-            animation: fade-in 0.5s ease-out;
-        }
+        .log-entry { animation: fade-in 0.5s ease-out; }
         @keyframes fade-in {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .flow-line {
-            stroke: #4b5563; /* gray-600 */
-            stroke-width: 2;
+            stroke-width: 3;
             fill: none;
             marker-end: url(#arrowhead);
+            transition: d 0.1s linear;
+        }
+        /* Custom slider styles */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 6px; cursor: pointer; background: #374151; border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: #3b82f6; cursor: pointer; margin-top: -5px;
         }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
 
-    <div class="container mx-auto p-4 max-w-7xl">
+    <div class="container mx-auto p-4 max-w-screen-2xl">
         <header class="mb-6">
             <h1 class="text-3xl font-bold text-white">Digital Factory Scaling Simulation</h1>
             <p class="text-gray-400 mt-1">Based on the report "Optimising software architecture using Operational Management".</p>
         </header>
 
-        <!-- Controls and Global Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
-                <h2 class="text-lg font-semibold text-gray-300 mb-2">Controls</h2>
-                <div class="flex space-x-2">
-                    <button id="startBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Start</button>
-                    <button id="stopBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded w-full" disabled>Stop</button>
-                </div>
-                 <div class="flex space-x-2 mt-2">
-                    <button id="typicalDayBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full">Typical Day</button>
-                    <button id="flashSaleBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded w-full">Flash Sale</button>
-                </div>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
-                <h2 class="text-lg font-semibold text-gray-300">Simulation Time</h2>
-                <p id="simTime" class="text-3xl font-bold text-white">00:00:00</p>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
-                <h2 class="text-lg font-semibold text-gray-300">Total Hourly Cost</h2>
-                <p id="totalCost" class="text-3xl font-bold text-green-400">$0.00</p>
-            </div>
-             <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
-                <h2 class="text-lg font-semibold text-gray-300">Incoming RPS</h2>
-                <p id="incomingRPS" class="text-3xl font-bold text-cyan-400">0</p>
-            </div>
-        </div>
-
-        <!-- Charts -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg lg:col-span-1">
-                <h3 class="text-lg font-semibold text-gray-300 mb-2">Incoming Requests (RPS)</h3>
-                <canvas id="rpsChart"></canvas>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg lg:col-span-1">
-                 <h3 class="text-lg font-semibold text-gray-300 mb-2">P95 Checkout Lead Time (ms)</h3>
-                <canvas id="latencyChart"></canvas>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg lg:col-span-1">
-                <h3 class="text-lg font-semibold text-gray-300 mb-2">Total Infrastructure Cost ($/hr)</h3>
-                <canvas id="costChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Microservices Visualization -->
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold text-white mb-4">Microservice Workstations</h2>
-            <div class="relative">
-                <!-- SVG Lines for Flow Diagram -->
-                <svg class="absolute w-full h-full" style="z-index: 1;">
-                    <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#4b5563" />
-                        </marker>
-                    </defs>
-                    <!-- API Gateway to User Auth -->
-                    <path d="M 50% 0 V 8%" class="flow-line"></path>
-                    <!-- User Auth to Product Catalog -->
-                    <path d="M 29% 12.5% H 71%" class="flow-line"></path>
-                    <!-- Product Catalog to Shopping Cart -->
-                    <path d="M 71% 17% C 71% 25%, 29% 25%, 29% 33%" class="flow-line"></path>
-                    <!-- Shopping Cart to Inventory -->
-                    <path d="M 29% 37.5% H 71%" class="flow-line"></path>
-                    <!-- Shopping Cart to Checkout -->
-                    <path d="M 21% 42% C 21% 50%, 42% 50%, 42% 58%" class="flow-line"></path>
-                    <!-- Inventory to Checkout -->
-                    <path d="M 79% 42% C 79% 50%, 58% 50%, 58% 58%" class="flow-line"></path>
-                    <!-- Checkout to Payment -->
-                    <path d="M 50% 67% V 70% C 50% 75%, 37% 75%, 37% 83%" class="flow-line"></path>
-                    <!-- Checkout to Order -->
-                    <path d="M 50% 67% V 70% C 50% 75%, 63% 75%, 63% 83%" class="flow-line"></path>
-                </svg>
-
-                <!-- Service Grid -->
-                <div class="relative grid grid-cols-12 gap-y-12" style="z-index: 2;">
-                    <!-- Row 1 -->
-                    <div class="col-start-4 col-span-6 text-center">
-                        <div class="inline-block bg-pink-600 text-white font-bold py-2 px-4 rounded-lg shadow-lg">API Gateway (Request Source)</div>
+        <!-- Main Grid -->
+        <div class="grid grid-cols-12 gap-6">
+            <!-- Left Column: Controls & Logs -->
+            <div class="col-span-12 lg:col-span-3 space-y-6">
+                <!-- Controls -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h2 class="text-lg font-semibold text-gray-300 mb-3">Master Controls</h2>
+                    <div class="flex space-x-2">
+                        <button id="startBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Start</button>
+                        <button id="stopBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded w-full" disabled>Stop</button>
                     </div>
-                    <div id="service-placeholder-UserAuthentication" class="col-start-2 col-span-3"></div>
-                    <div class="col-span-4"></div> <!-- Spacer -->
-                    <div id="service-placeholder-ProductCatalog" class="col-start-8 col-span-3"></div>
-                    
-                    <!-- Row 2 -->
-                    <div id="service-placeholder-ShoppingCart" class="col-start-2 col-span-3"></div>
-                    <div class="col-span-4"></div> <!-- Spacer -->
-                    <div id="service-placeholder-Inventory" class="col-start-8 col-span-3"></div>
+                </div>
 
-                    <!-- Row 3 -->
-                    <div id="service-placeholder-Checkout" class="col-start-5 col-span-4"></div>
+                <!-- Traffic Controls -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h2 class="text-lg font-semibold text-gray-300 mb-3">Traffic Controls</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="rpsSlider" class="block text-sm font-medium">Base Requests per Second (RPS)</label>
+                            <div class="flex items-center space-x-2">
+                                <input id="rpsSlider" type="range" min="0" max="1500" value="50" class="w-full">
+                                <span id="rpsValue" class="font-mono text-cyan-400 w-12 text-center">50</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Request Mix</label>
+                            <div class="space-y-2 mt-2">
+                                <div class="flex items-center space-x-2">
+                                    <label for="browserSlider" class="w-20 text-green-400">Browsers:</label>
+                                    <input id="browserSlider" type="range" min="0" max="100" value="70" class="w-full mix-slider">
+                                    <span id="browserValue" class="font-mono text-green-400 w-12 text-center">70%</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <label for="shopperSlider" class="w-20 text-yellow-400">Shoppers:</label>
+                                    <input id="shopperSlider" type="range" min="0" max="100" value="25" class="w-full mix-slider">
+                                    <span id="shopperValue" class="font-mono text-yellow-400 w-12 text-center">25%</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <label for="buyerSlider" class="w-20 text-pink-400">Buyers:</label>
+                                    <input id="buyerSlider" type="range" min="0" max="100" value="5" class="w-full mix-slider">
+                                    <span id="buyerValue" class="font-mono text-pink-400 w-12 text-center">5%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <h3 class="text-md font-semibold text-gray-300 mb-2">Load Scenarios</h3>
+                        <div class="flex space-x-2">
+                           <button id="typicalDayBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full text-sm">Typical Day</button>
+                           <button id="flashSaleBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded w-full text-sm">Flash Sale</button>
+                        </div>
+                    </div>
+                </div>
 
-                    <!-- Row 4 -->
-                    <div id="service-placeholder-Payment" class="col-start-3 col-span-3"></div>
-                    <div class="col-span-4"></div> <!-- Spacer -->
-                    <div id="service-placeholder-Order" class="col-start-7 col-span-3"></div>
+                <!-- Event Log -->
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-4">Event Log</h2>
+                    <div id="logContainer" class="bg-gray-800 p-4 rounded-lg shadow-lg h-96 overflow-y-auto font-mono text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Right Column: Sim & Charts -->
+            <div class="col-span-12 lg:col-span-9">
+                <!-- Global Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                        <h2 class="text-lg font-semibold text-gray-300">Simulation Time</h2>
+                        <p id="simTime" class="text-3xl font-bold text-white">00:00:00</p>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                        <h2 class="text-lg font-semibold text-gray-300">Total Hourly Cost</h2>
+                        <p id="totalCost" class="text-3xl font-bold text-green-400">$0.00</p>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
+                        <h2 class="text-lg font-semibold text-gray-300">Total Incoming RPS</h2>
+                        <p id="incomingRPS" class="text-3xl font-bold text-cyan-400">0</p>
+                    </div>
+                </div>
+                
+                <!-- Main Charts -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">Incoming RPS Pattern</h3><canvas id="rpsChart"></canvas></div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">P95 Checkout Lead Time (ms)</h3><canvas id="latencyChart"></canvas></div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">Total Infrastructure Cost ($/hr)</h3><canvas id="costChart"></canvas></div>
+                </div>
+
+                <!-- Journey Breakdown Chart -->
+                 <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-6">
+                    <h3 class="text-lg font-semibold text-gray-300 mb-2">Last Checkout Request Journey Breakdown (ms)</h3>
+                    <canvas id="journeyChart" height="120"></canvas>
+                </div>
+
+                <!-- Microservices Visualization -->
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-4">Microservice Workstations</h2>
+                    <div id="servicesContainerWrapper" class="relative h-[600px] bg-gray-800/20 rounded-lg">
+                        <div id="userIcon" class="absolute flex flex-col items-center" style="top: 2%; left: 45%; z-index: 5;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span class="text-sm font-semibold text-blue-300">Users</span>
+                        </div>
+                        <svg id="svgCanvas" class="absolute w-full h-full" style="z-index: 1;">
+                            <defs><marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22c55e" /></marker>
+                            <marker id="arrowhead-yellow" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#facc15" /></marker>
+                            <marker id="arrowhead-pink" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#f472b6" /></marker>
+                            </defs>
+                        </svg>
+                        <div id="servicesContainer" class="relative w-full h-full">
+                            <!-- Service boxes will be positioned absolutely by JS -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <!-- Event Log -->
-        <div>
-            <h2 class="text-2xl font-bold text-white mb-4">Event Log</h2>
-            <div id="logContainer" class="bg-gray-800 p-4 rounded-lg shadow-lg h-64 overflow-y-auto font-mono text-sm">
-                <!-- Log entries will be injected here -->
-            </div>
-        </div>
-
     </div>
 
     <script>
-        // --- CONFIGURATION & SETUP ---
-        const SERVICE_DEFINITIONS = {
-            'UserAuthentication': { name: 'User Auth', s: 20, cv_s: 1.2, cost: 0.090, scaleOutUtil: 0.80, scaleInUtil: 0.40, p95Slo: 50, emergencySlo: 75 },
-            'ProductCatalog': { name: 'Product Catalog', s: 15, cv_s: 1.5, cost: 0.090, scaleOutUtil: 0.85, scaleInUtil: 0.30, p95Slo: 40, emergencySlo: 60 },
-            'Inventory': { name: 'Inventory', s: 50, cv_s: 2.0, cost: 0.180, scaleOutUtil: 0.75, scaleInUtil: 0.40, p95Slo: 150, emergencySlo: 200 },
-            'ShoppingCart': { name: 'Shopping Cart', s: 30, cv_s: 1.8, cost: 0.180, scaleOutUtil: 0.80, scaleInUtil: 0.40, p95Slo: 100, emergencySlo: 150 },
-            'Checkout': { name: 'Checkout', s: 100, cv_s: 2.5, cost: 0.361, scaleOutUtil: 0.70, scaleInUtil: 0.50, p95Slo: 250, emergencySlo: 350 },
-            'Payment': { name: 'Payment', s: 250, cv_s: 3.0, cost: 0.090, scaleOutUtil: 0.70, scaleInUtil: 0.50, p95Slo: 400, emergencySlo: 500 },
-            'Order': { name: 'Order', s: 80, cv_s: 2.2, cost: 0.180, scaleOutUtil: 0.75, scaleInUtil: 0.40, p95Slo: 200, emergencySlo: 300 },
-        };
+    // --- CONFIGURATION & SETUP ---
+    const SERVICE_DEFINITIONS = {
+        'UserAuthentication': { name: 'User Auth', s: 2, cv_s: 1.2, cost: 0.090, scaleOutUtil: 0.80, scaleInUtil: 0.40, p95Slo: 50, emergencySlo: 3 },
+        'ProductCatalog': { name: 'Product Catalog', s: 15, cv_s: 1.5, cost: 0.090, scaleOutUtil: 0.85, scaleInUtil: 0.30, p95Slo: 40, emergencySlo: 60 },
+        'Inventory': { name: 'Inventory', s: 50, cv_s: 2.0, cost: 0.180, scaleOutUtil: 0.75, scaleInUtil: 0.40, p95Slo: 150, emergencySlo: 200 },
+        'ShoppingCart': { name: 'Shopping Cart', s: 30, cv_s: 1.8, cost: 0.180, scaleOutUtil: 0.80, scaleInUtil: 0.40, p95Slo: 100, emergencySlo: 150 },
+        'Checkout': { name: 'Checkout', s: 100, cv_s: 2.5, cost: 0.361, scaleOutUtil: 0.70, scaleInUtil: 0.50, p95Slo: 250, emergencySlo: 350 },
+        'Payment': { name: 'Payment', s: 250, cv_s: 3.0, cost: 0.090, scaleOutUtil: 0.70, scaleInUtil: 0.50, p95Slo: 400, emergencySlo: 500 },
+        'Order': { name: 'Order', s: 80, cv_s: 2.2, cost: 0.180, scaleOutUtil: 0.75, scaleInUtil: 0.40, p95Slo: 200, emergencySlo: 300 },
+    };
 
-        const REQUEST_ROUTING = {
-            'Search': ['UserAuthentication', 'ProductCatalog'],
-            'ViewProduct': ['UserAuthentication', 'ProductCatalog'],
-            'AddToCart': ['UserAuthentication', 'ProductCatalog', 'ShoppingCart'],
-            'ViewCart': ['UserAuthentication', 'ProductCatalog', 'ShoppingCart'],
-            'StartCheckout': ['UserAuthentication', 'ProductCatalog', 'ShoppingCart', 'Inventory', 'Checkout'],
-            'ProcessPayment': ['UserAuthentication', 'ShoppingCart', 'Inventory', 'Checkout', 'Payment'],
-            'CreateOrder': ['UserAuthentication', 'ShoppingCart', 'Inventory', 'Checkout', 'Order'],
-        };
+    const REQUEST_ROUTING = {
+        'Browser': { types: ['Search', 'ViewProduct'], routing: { 'Search': ['UserAuthentication', 'ProductCatalog'], 'ViewProduct': ['UserAuthentication', 'ProductCatalog']}, color: '#22c55e', marker: 'url(#arrowhead-green)'},
+        'Shopper': { types: ['AddToCart', 'ViewCart'], routing: { 'AddToCart': ['UserAuthentication', 'ProductCatalog', 'ShoppingCart'], 'ViewCart': ['UserAuthentication', 'ProductCatalog', 'ShoppingCart']}, color: '#facc15', marker: 'url(#arrowhead-yellow)'},
+        'Buyer': { types: ['StartCheckout', 'ProcessPayment', 'CreateOrder'], routing: { 'StartCheckout': ['UserAuthentication', 'ProductCatalog', 'ShoppingCart', 'Inventory', 'Checkout'], 'ProcessPayment': ['UserAuthentication', 'ShoppingCart', 'Inventory', 'Checkout', 'Payment'], 'CreateOrder': ['UserAuthentication', 'ShoppingCart', 'Inventory', 'Checkout', 'Order']}, color: '#f472b6', marker: 'url(#arrowhead-pink)'},
+    };
+
+    const SERVICE_LAYOUT = {
+        'UserAuthentication': { top: '18%', left: '37.5%' },
+        'ProductCatalog': { top: '35%', left: '5%' },
+        'ShoppingCart': { top: '35%', left: '70%' },
+        'Inventory': { top: '55%', left: '5%' },
+        'Checkout': { top: '55%', left: '70%' },
+        'Payment': { top: '75%', left: '45%' },
+        'Order': { top: '75%', left: '70%' },
+    };
+
+    // --- GLOBAL STATE ---
+    let simulationInterval, simTimeSeconds = 0, services = {}, globalRequestId = 0;
+    let lastCompletedCheckoutJourney = null, completedCheckoutLatencies = [];
+    let currentScenario = () => 1;
+    let lastChartUpdateTime = 0;
+
+    const TICKS_PER_SECOND = 5;
+    const SUSTAINED_PERIOD_SECONDS = { out: 30, in: 120, emergency: 10 };
+    const ROLLING_WINDOW_SIZE = 100;
+
+    // --- DOM ELEMENTS ---
+    const startBtn = document.getElementById('startBtn'), stopBtn = document.getElementById('stopBtn');
+    const servicesContainer = document.getElementById('servicesContainer');
+    const logContainer = document.getElementById('logContainer');
+    const rpsSlider = document.getElementById('rpsSlider'), rpsValue = document.getElementById('rpsValue');
+    
+    // --- CHART SETUP ---
+    let charts = {};
+    function createChart(ctx, label, color) {
+        return new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: `${color}33`, borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }] },
+            options: { scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+        });
+    }
+
+    function initializeCharts() {
+        Object.values(charts).forEach(c => c.destroy());
+        charts.rps = createChart(document.getElementById('rpsChart').getContext('2d'), 'Incoming RPS', '#22d3ee');
+        charts.latency = createChart(document.getElementById('latencyChart').getContext('2d'), 'P95 Checkout Latency', '#f472b6');
+        charts.cost = createChart(document.getElementById('costChart').getContext('2d'), 'Total Cost ($/hr)', '#4ade80');
+        charts.journey = new Chart(document.getElementById('journeyChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: [], datasets: [
+                { label: 'Queue Time (ms)', data: [], backgroundColor: '#facc15' },
+                { label: 'Processing Time (ms)', data: [], backgroundColor: '#3b82f6' }
+            ]},
+            options: { indexAxis: 'y', responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    
+    // --- SIMULATION CORE ---
+    class Microservice {
+        constructor(id, def) {
+            this.id = id; this.def = def; this.instances = 1; this.queue = [];
+            this.processing = []; this.completedWindow = []; this.utilization = 0;
+            this.p95 = 0; this.utilOutTimer = 0; this.utilInTimer = 0; this.emergencyTimer = 0;
+            this.createElement();
+        }
+
+        createElement() {
+            const box = document.createElement('div');
+            box.id = `service-${this.id}`;
+            box.className = 'service-box absolute bg-gray-800 p-3 rounded-lg shadow-lg w-1/4';
+            box.style.top = SERVICE_LAYOUT[this.id].top;
+            box.style.left = SERVICE_LAYOUT[this.id].left;
+            box.innerHTML = `
+                <h3 class="font-bold text-md text-white">${this.def.name}</h3>
+                <div class="mt-1 space-y-1 text-xs">
+                    <div class="flex justify-between"><span>Instances:</span> <span id="inst-${this.id}" class="font-semibold text-cyan-400">1</span></div>
+                    <div class="flex justify-between"><span>Queue:</span> <span id="q-${this.id}" class="font-semibold text-yellow-400">0</span></div>
+                    <div class="flex justify-between"><span>Utilization:</span> <span id="util-${this.id}" class="font-semibold text-purple-400">0%</span></div>
+                    <div class="flex justify-between"><span>P95 (ms):</span> <span id="p95-${this.id}" class="font-semibold text-pink-400">0</span></div>
+                    <div class="flex justify-between"><span>Avg. Proc. Time:</span> <span class="font-semibold text-gray-300">${this.def.s}ms</span></div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400 space-y-1">
+                    <div>Scale > <b>${this.def.scaleOutUtil * 100}%</b> Util</div>
+                    <div>Scale > <b>${this.def.emergencySlo}ms</b> P95</div>
+                </div>
+                <div id="viz-${this.id}" class="mt-2 flex flex-wrap gap-1"></div>`;
+            servicesContainer.appendChild(box);
+            this.updateInstanceViz();
+        }
+
+        enqueue(request) {
+            request.queueEntryTime = simTimeSeconds;
+            this.queue.push(request);
+        }
+
+        tick() {
+            this.processing = this.processing.filter(p => {
+                p.timeLeft -= 1000 / TICKS_PER_SECOND;
+                if (p.timeLeft <= 0) { this.onRequestComplete(p.request); return false; }
+                return true;
+            });
+
+            while (this.processing.length < this.instances && this.queue.length > 0) {
+                const request = this.queue.shift();
+                const queueTime = (simTimeSeconds - request.queueEntryTime) * 1000;
+                request.timeEnteredService = simTimeSeconds;
+                const serviceTime = this.def.s * (1 + (Math.random() - 0.5) * this.def.cv_s * 2);
+                request.journey.push({ service: this.def.name, queueTime: queueTime, processingTime: 0 });
+                this.processing.push({ request, timeLeft: Math.max(1, serviceTime) });
+            }
+
+            this.utilization = this.instances > 0 ? this.processing.length / this.instances : 0;
+            this.calculateP95();
+            this.checkScaling();
+        }
+
+        onRequestComplete(request) {
+            const processingTime = (simTimeSeconds - request.timeEnteredService) * 1000;
+            request.journey[request.journey.length-1].processingTime = processingTime;
+            const timeInService = processingTime + request.journey[request.journey.length-1].queueTime;
+            this.completedWindow.push(timeInService);
+            if (this.completedWindow.length > ROLLING_WINDOW_SIZE) this.completedWindow.shift();
+
+            request.path.shift();
+            if (request.path.length > 0) {
+                services[request.path[0]].enqueue(request);
+            } else if (request.type === 'StartCheckout') {
+                const totalTime = (simTimeSeconds - request.startTime) * 1000;
+                completedCheckoutLatencies.push(totalTime);
+                if (completedCheckoutLatencies.length > ROLLING_WINDOW_SIZE) completedCheckoutLatencies.shift();
+                lastCompletedCheckoutJourney = request.journey;
+            }
+        }
+
+        calculateP95() {
+            if (this.completedWindow.length < 10) { this.p95 = 0; return; }
+            const sorted = [...this.completedWindow].sort((a, b) => a - b);
+            this.p95 = sorted[Math.floor(sorted.length * 0.95) - 1];
+        }
+
+        checkScaling() {
+            if (this.p95 > this.def.emergencySlo) {
+                this.emergencyTimer += 1;
+                if (this.emergencyTimer >= SUSTAINED_PERIOD_SECONDS.emergency * TICKS_PER_SECOND) {
+                    this.scaleOut(`P95 Latency ${this.p95.toFixed(0)}ms > ${this.def.emergencySlo}ms SLO`);
+                    this.emergencyTimer = 0;
+                }
+            } else { this.emergencyTimer = 0; }
+
+            if (this.utilization > this.def.scaleOutUtil) {
+                this.utilOutTimer += 1;
+                if (this.utilOutTimer >= SUSTAINED_PERIOD_SECONDS.out * TICKS_PER_SECOND) {
+                    this.scaleOut(`Utilization ${(this.utilization*100).toFixed(0)}% > ${(this.def.scaleOutUtil*100)}%`);
+                    this.utilOutTimer = 0;
+                }
+            } else { this.utilOutTimer = 0; }
+
+            if (this.utilization < this.def.scaleInUtil && this.instances > 1) {
+                this.utilInTimer += 1;
+                if (this.utilInTimer >= SUSTAINED_PERIOD_SECONDS.in * TICKS_PER_SECOND) {
+                    this.scaleIn(`Utilization ${(this.utilization*100).toFixed(0)}% < ${(this.def.scaleInUtil*100)}%`);
+                    this.utilInTimer = 0;
+                }
+            } else { this.utilInTimer = 0; }
+        }
+
+        scaleOut(reason) {
+            this.instances++;
+            logEvent(`SCALING UP ${this.def.name} to ${this.instances}. Reason: ${reason}.`, 'text-green-400');
+            this.updateInstanceViz(true);
+        }
+
+        scaleIn(reason) {
+            if (this.instances <= 1) return;
+            this.instances--;
+            logEvent(`SCALING DOWN ${this.def.name} to ${this.instances}. Reason: ${reason}.`, 'text-yellow-400');
+            this.updateInstanceViz(false, true);
+        }
+
+        updateUI() {
+            document.getElementById(`inst-${this.id}`).textContent = this.instances;
+            document.getElementById(`q-${this.id}`).textContent = this.queue.length;
+            document.getElementById(`util-${this.id}`).textContent = `${(this.utilization * 100).toFixed(1)}%`;
+            const p95El = document.getElementById(`p95-${this.id}`);
+            p95El.textContent = this.p95.toFixed(0);
+            p95El.className = `font-semibold ${this.p95 > this.def.emergencySlo ? 'text-red-500 animate-pulse' : 'text-pink-400'}`;
+            const vizContainer = document.getElementById(`viz-${this.id}`);
+            for(let i = 0; i < this.instances; i++) {
+                if(!vizContainer.children[i]) continue;
+                vizContainer.children[i].classList.toggle('busy', i < this.processing.length);
+                vizContainer.children[i].classList.toggle('idle', i >= this.processing.length);
+            }
+        }
         
-        let simulationInterval;
-        let simTimeSeconds = 0;
-        let services = {};
-        let globalRequestId = 0;
-        let completedCheckoutRequests = [];
-        let currentScenario = () => 0;
+        updateInstanceViz(isScalingUp = false, isScalingDown = false) {
+             const vizContainer = document.getElementById(`viz-${this.id}`);
+             const currentVizCount = vizContainer.children.length;
+            if (this.instances > currentVizCount) {
+                for (let i = 0; i < this.instances - currentVizCount; i++) {
+                    const el = document.createElement('div');
+                    el.className = 'instance idle rounded-sm';
+                    if(isScalingUp) el.classList.add('scaling-up');
+                    vizContainer.appendChild(el);
+                }
+            } else if (this.instances < currentVizCount) {
+                for (let i = 0; i < currentVizCount - this.instances; i++) {
+                     const el = vizContainer.lastElementChild;
+                     if (isScalingDown) {
+                        el.classList.add('scaling-down');
+                        el.addEventListener('animationend', () => el.remove());
+                     } else { el.remove(); }
+                }
+            }
+        }
+    }
 
-        const TICKS_PER_SECOND = 5;
-        const SUSTAINED_PERIOD_SECONDS = { out: 60, in: 180, emergency: 10 };
-        const ROLLING_WINDOW_SIZE = 100;
+    function initializeServices() {
+        servicesContainer.innerHTML = '';
+        services = {};
+        for (const [id, def] of Object.entries(SERVICE_DEFINITIONS)) {
+            services[id] = new Microservice(id, def);
+        }
+        drawFlowLines();
+        addDragFunctionality();
+    }
+    
+    function drawFlowLines() {
+        const svg = document.getElementById('svgCanvas');
+        svg.innerHTML = svg.querySelector('defs').outerHTML; // Clear lines but keep defs
 
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const typicalDayBtn = document.getElementById('typicalDayBtn');
-        const flashSaleBtn = document.getElementById('flashSaleBtn');
-        const simTimeEl = document.getElementById('simTime');
-        const totalCostEl = document.getElementById('totalCost');
-        const incomingRPSEl = document.getElementById('incomingRPS');
-        const logContainer = document.getElementById('logContainer');
+        // Line from user icon to auth service
+        const userIcon = document.getElementById('userIcon');
+        const authService = document.getElementById('service-UserAuthentication');
+        if (userIcon && authService) {
+            const fromRect = { top: userIcon.offsetTop, left: userIcon.offsetLeft, width: userIcon.offsetWidth, height: userIcon.offsetHeight };
+            const toRect = { top: authService.offsetTop, left: authService.offsetLeft, width: authService.offsetWidth, height: authService.offsetHeight };
+            const x1 = fromRect.left + fromRect.width / 2;
+            const y1 = fromRect.top + fromRect.height;
+            const x2 = toRect.left + toRect.width / 2;
+            const y2 = toRect.top;
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+            path.setAttribute('class', 'flow-line');
+            path.style.stroke = '#a78bfa'; // purple-400
+            svg.appendChild(path);
+        }
         
-        let charts = {};
-        function createChart(ctx, label, color) {
-            return new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: label,
-                        data: [],
-                        borderColor: color,
-                        backgroundColor: `${color}33`,
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.4,
-                        fill: true,
-                    }]
-                },
-                options: {
-                    scales: {
-                        x: { ticks: { display: false }, grid: { color: '#4b5563' } },
-                        y: { beginAtZero: true, grid: { color: '#4b5563' }, ticks: { color: '#d1d5db'} }
-                    },
-                    plugins: { legend: { display: false } },
-                    animation: { duration: 200 }
+        Object.values(REQUEST_ROUTING).forEach(cat => {
+            Object.values(cat.routing).forEach(route => {
+                for (let i = 0; i < route.length - 1; i++) {
+                    const fromEl = document.getElementById(`service-${route[i]}`);
+                    const toEl = document.getElementById(`service-${route[i+1]}`);
+                    if (!fromEl || !toEl) continue;
+                    
+                    const fromRect = { top: fromEl.offsetTop, left: fromEl.offsetLeft, width: fromEl.offsetWidth, height: fromEl.offsetHeight };
+                    const toRect = { top: toEl.offsetTop, left: toEl.offsetLeft, width: toEl.offsetWidth, height: toEl.offsetHeight };
+                    
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const x1 = fromRect.left + fromRect.width / 2;
+                    const y1 = fromRect.top + fromRect.height / 2;
+                    const x2 = toRect.left + toRect.width / 2;
+                    const y2 = toRect.top + toRect.height / 2;
+
+                    // Offset for parallel lines
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    const perpAngle = angle + Math.PI / 2;
+                    let offset = 0;
+                    if (cat.color === '#22c55e') offset = -6; // green
+                    if (cat.color === '#f472b6') offset = 6;  // pink
+                    
+                    const ox1 = x1 + offset * Math.cos(perpAngle);
+                    const oy1 = y1 + offset * Math.sin(perpAngle);
+                    const ox2 = x2 + offset * Math.cos(perpAngle);
+                    const oy2 = y2 + offset * Math.sin(perpAngle);
+
+                    path.setAttribute('d', `M ${ox1} ${oy1} L ${ox2} ${oy2}`);
+                    path.setAttribute('class', 'flow-line');
+                    path.style.stroke = cat.color;
+                    path.setAttribute('marker-end', cat.marker);
+                    svg.appendChild(path);
                 }
             });
-        }
+        });
+    }
 
-        function initializeCharts() {
-            charts.rps = createChart(document.getElementById('rpsChart').getContext('2d'), 'Incoming RPS', '#22d3ee');
-            charts.latency = createChart(document.getElementById('latencyChart').getContext('2d'), 'P95 Checkout Latency (ms)', '#f472b6');
-            charts.cost = createChart(document.getElementById('costChart').getContext('2d'), 'Total Cost ($/hr)', '#4ade80');
-        }
-
-        class Microservice {
-            constructor(id, def) {
-                this.id = id;
-                this.def = def;
-                this.instances = 1;
-                this.queue = [];
-                this.processing = [];
-                this.completedWindow = [];
-                this.utilization = 0;
-                this.p95 = 0;
-                this.utilOutTimer = 0;
-                this.utilInTimer = 0;
-                this.emergencyTimer = 0;
-                this.createElement();
+    // --- MAIN SIMULATION LOOP ---
+    function simulationTick() {
+        simTimeSeconds += 1 / TICKS_PER_SECOND;
+        const baseRPS = parseFloat(rpsSlider.value);
+        const loadFactor = currentScenario(simTimeSeconds);
+        const totalRPS = baseRPS * loadFactor;
+        
+        const browserWeight = parseFloat(document.getElementById('browserSlider').value) / 100;
+        const shopperWeight = parseFloat(document.getElementById('shopperSlider').value) / 100;
+        
+        for (let i = 0; i < totalRPS / TICKS_PER_SECOND; i++) {
+            const rand = Math.random();
+            let category = (rand < browserWeight) ? 'Browser' : (rand < browserWeight + shopperWeight) ? 'Shopper' : 'Buyer';
+            const catInfo = REQUEST_ROUTING[category];
+            const requestType = catInfo.types[Math.floor(Math.random() * catInfo.types.length)];
+            const path = [...catInfo.routing[requestType]];
+            if (path.length > 0) {
+                services[path[0]].enqueue({ id: globalRequestId++, type: requestType, path, startTime: simTimeSeconds, journey: [] });
             }
-
-            createElement() {
-                const placeholder = document.getElementById(`service-placeholder-${this.id}`);
-                if (!placeholder) return;
-
-                const box = document.createElement('div');
-                box.id = `service-${this.id}`;
-                box.className = 'service-box bg-gray-800 p-4 rounded-lg shadow-lg h-full flex flex-col justify-between';
-                box.innerHTML = `
-                    <div>
-                        <h3 class="font-bold text-lg text-white">${this.def.name}</h3>
-                        <div class="mt-2 space-y-2 text-sm">
-                            <div class="flex justify-between"><span>Instances:</span> <span id="inst-${this.id}" class="font-semibold text-cyan-400">1</span></div>
-                            <div class="flex justify-between"><span>Queue:</span> <span id="q-${this.id}" class="font-semibold text-yellow-400">0</span></div>
-                            <div class="flex justify-between"><span>Utilization:</span> <span id="util-${this.id}" class="font-semibold text-purple-400">0%</span></div>
-                            <div class="flex justify-between"><span>P95 (ms):</span> <span id="p95-${this.id}" class="font-semibold text-pink-400">0</span></div>
-                        </div>
-                    </div>
-                    <div id="viz-${this.id}" class="mt-3 flex flex-wrap gap-1"></div>
-                `;
-                placeholder.appendChild(box);
-                this.updateInstanceViz();
-            }
-
-            enqueue(request) { this.queue.push(request); }
-
-            tick() {
-                this.processing = this.processing.filter(p => {
-                    p.timeLeft -= 1000 / TICKS_PER_SECOND;
-                    if (p.timeLeft <= 0) {
-                        this.onRequestComplete(p.request);
-                        return false;
-                    }
-                    return true;
-                });
-
-                while (this.processing.length < this.instances && this.queue.length > 0) {
-                    const request = this.queue.shift();
-                    request.timeEnteredService = simTimeSeconds;
-                    const serviceTime = this.def.s * (1 + (Math.random() - 0.5) * this.def.cv_s * 2);
-                    this.processing.push({ request, timeLeft: Math.max(1, serviceTime) });
-                }
-
-                this.utilization = this.instances > 0 ? this.processing.length / this.instances : 0;
-                this.calculateP95();
-                this.checkScaling();
-            }
-
-            onRequestComplete(request) {
-                const timeInService = (simTimeSeconds - request.timeEnteredService) * 1000;
-                this.completedWindow.push(timeInService);
-                if (this.completedWindow.length > ROLLING_WINDOW_SIZE) this.completedWindow.shift();
-
-                request.path.shift();
-                if (request.path.length > 0) {
-                    services[request.path[0]].enqueue(request);
-                } else if (request.type === 'StartCheckout') {
-                    const totalTime = (simTimeSeconds - request.startTime) * 1000;
-                    completedCheckoutRequests.push(totalTime);
-                    if (completedCheckoutRequests.length > ROLLING_WINDOW_SIZE) completedCheckoutRequests.shift();
-                }
-            }
-
-            calculateP95() {
-                if (this.completedWindow.length < 10) { this.p95 = 0; return; }
-                const sorted = [...this.completedWindow].sort((a, b) => a - b);
-                this.p95 = sorted[Math.floor(sorted.length * 0.95) - 1];
-            }
-
-            checkScaling() {
-                if (this.p95 > this.def.emergencySlo) {
-                    this.emergencyTimer += 1;
-                    if (this.emergencyTimer >= SUSTAINED_PERIOD_SECONDS.emergency * TICKS_PER_SECOND) {
-                        this.scaleOut('P95 SLO Breach');
-                        this.emergencyTimer = 0;
-                    }
-                } else { this.emergencyTimer = 0; }
-
-                if (this.utilization > this.def.scaleOutUtil) {
-                    this.utilOutTimer += 1;
-                    if (this.utilOutTimer >= SUSTAINED_PERIOD_SECONDS.out * TICKS_PER_SECOND) {
-                        this.scaleOut('High Utilization');
-                        this.utilOutTimer = 0;
-                    }
-                } else { this.utilOutTimer = 0; }
-
-                if (this.utilization < this.def.scaleInUtil && this.instances > 1) {
-                    this.utilInTimer += 1;
-                    if (this.utilInTimer >= SUSTAINED_PERIOD_SECONDS.in * TICKS_PER_SECOND) {
-                        this.scaleIn();
-                        this.utilInTimer = 0;
-                    }
-                } else { this.utilInTimer = 0; }
-            }
-
-            scaleOut(reason) {
-                this.instances++;
-                logEvent(`SCALING UP ${this.def.name} to ${this.instances} instances. Reason: ${reason}.`, 'text-green-400');
-                this.updateInstanceViz(true);
-            }
-
-            scaleIn() {
-                if (this.instances <= 1) return;
-                this.instances--;
-                logEvent(`SCALING DOWN ${this.def.name} to ${this.instances} instances. Reason: Low Utilization.`, 'text-yellow-400');
-                this.updateInstanceViz(false, true);
-            }
-
-            updateUI() {
-                document.getElementById(`inst-${this.id}`).textContent = this.instances;
-                document.getElementById(`q-${this.id}`).textContent = this.queue.length;
-                document.getElementById(`util-${this.id}`).textContent = `${(this.utilization * 100).toFixed(1)}%`;
-                const p95El = document.getElementById(`p95-${this.id}`);
-                p95El.textContent = this.p95.toFixed(0);
-                p95El.className = `font-semibold ${this.p95 > this.def.emergencySlo ? 'text-red-500 animate-pulse' : 'text-pink-400'}`;
-
-                const vizContainer = document.getElementById(`viz-${this.id}`);
-                for(let i = 0; i < this.instances; i++) {
-                    const instanceEl = vizContainer.children[i];
-                    if (i < this.processing.length) {
-                        instanceEl.classList.replace('idle', 'busy');
-                    } else {
-                        instanceEl.classList.replace('busy', 'idle');
-                    }
-                }
-            }
-            
-            updateInstanceViz(isScalingUp = false, isScalingDown = false) {
-                 const vizContainer = document.getElementById(`viz-${this.id}`);
-                 const currentVizCount = vizContainer.children.length;
-
-                if (this.instances > currentVizCount) {
-                    for (let i = 0; i < this.instances - currentVizCount; i++) {
-                        const instanceEl = document.createElement('div');
-                        instanceEl.className = 'instance idle rounded-sm';
-                        if(isScalingUp) instanceEl.classList.add('scaling-up');
-                        vizContainer.appendChild(instanceEl);
-                    }
-                } else if (this.instances < currentVizCount) {
-                    for (let i = 0; i < currentVizCount - this.instances; i++) {
-                         const instanceToRemove = vizContainer.lastElementChild;
-                         if (isScalingDown) {
-                            instanceToRemove.classList.add('scaling-down');
-                            instanceToRemove.addEventListener('animationend', () => instanceToRemove.remove());
-                         } else {
-                            instanceToRemove.remove();
-                         }
-                    }
-                }
-            }
-        }
-
-        function initializeServices() {
-            document.querySelectorAll('[id^="service-placeholder-"]').forEach(p => p.innerHTML = '');
-            services = {};
-            for (const [id, def] of Object.entries(SERVICE_DEFINITIONS)) {
-                services[id] = new Microservice(id, def);
-            }
-        }
-
-        function typicalDayScenario(time) {
-            const peakRPS = 150;
-            const troughRPS = 10;
-            const cycleSeconds = 24 * 60 * 2;
-            const rps = (peakRPS - troughRPS) / 2 * Math.sin((time / cycleSeconds) * 2 * Math.PI - Math.PI / 2) + (peakRPS + troughRPS) / 2;
-            return Math.max(troughRPS, rps);
-        }
-
-        function flashSaleScenario(time) {
-            const baseRPS = 50;
-            const saleStart = 60;
-            const saleDuration = 300;
-            const saleEnd = saleStart + saleDuration;
-            const peakRPS = 1000;
-
-            if (time > saleStart && time < saleEnd) {
-                const timeIntoSale = time - saleStart;
-                const peakTime = saleDuration / 2;
-                return peakRPS - Math.pow(timeIntoSale - peakTime, 2) * (peakRPS - baseRPS) / Math.pow(peakTime, 2);
-            }
-            return baseRPS;
-        }
-
-        function simulationTick() {
-            simTimeSeconds += 1 / TICKS_PER_SECOND;
-            const rps = currentScenario(simTimeSeconds);
-            const requestsToGenerate = rps / TICKS_PER_SECOND;
-            for (let i = 0; i < requestsToGenerate; i++) {
-                const rand = Math.random();
-                let requestType;
-                if (rand < 0.7) requestType = 'ViewProduct';
-                else if (rand < 0.85) requestType = 'Search';
-                else if (rand < 0.95) requestType = 'AddToCart';
-                else if (rand < 0.98) requestType = 'StartCheckout';
-                else requestType = 'CreateOrder';
-                
-                const path = [...REQUEST_ROUTING[requestType]];
-                if (path.length > 0) {
-                    services[path[0]].enqueue({
-                        id: globalRequestId++, type: requestType, path: path,
-                        startTime: simTimeSeconds, timeEnteredService: simTimeSeconds
-                    });
-                }
-            }
-            
-            Object.values(services).forEach(service => service.tick());
-            updateUI(rps);
         }
         
-        function getP95CheckoutLatency() {
-            if (completedCheckoutRequests.length < 10) return 0;
-            const sorted = [...completedCheckoutRequests].sort((a,b) => a-b);
-            return sorted[Math.floor(sorted.length * 0.95) - 1];
+        Object.values(services).forEach(service => service.tick());
+        updateUI(totalRPS);
+    }
+    
+    function updateUI(rps) {
+        const timeString = new Date(simTimeSeconds * 1000).toISOString().substr(11, 8);
+        document.getElementById('simTime').textContent = timeString;
+        document.getElementById('totalCost').textContent = `$${Object.values(services).reduce((acc, s) => acc + (s.instances * s.def.cost), 0).toFixed(2)}`;
+        document.getElementById('incomingRPS').textContent = Math.round(rps);
+        Object.values(services).forEach(service => service.updateUI());
+        
+        if (simTimeSeconds - lastChartUpdateTime >= 1) {
+            const p95 = completedCheckoutLatencies.length < 10 ? 0 : [...completedCheckoutLatencies].sort((a,b)=>a-b)[Math.floor(completedCheckoutLatencies.length * 0.95)-1];
+            updateChart(charts.rps, timeString, rps);
+            updateChart(charts.latency, timeString, p95);
+            updateChart(charts.cost, timeString, parseFloat(document.getElementById('totalCost').textContent.substring(1)));
+            updateJourneyChart();
+            lastChartUpdateTime = simTimeSeconds;
         }
+    }
+    
+    function updateChart(chart, label, data) {
+        if (!chart || !chart.data) return;
+        chart.data.labels.push(label);
+        chart.data.datasets[0].data.push(data);
+        if (chart.data.labels.length > 100) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+        }
+        chart.update();
+    }
 
-        function updateUI(rps) {
-            const hours = Math.floor(simTimeSeconds / 3600);
-            const minutes = Math.floor((simTimeSeconds % 3600) / 60);
-            const seconds = Math.floor(simTimeSeconds % 60);
-            const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            simTimeEl.textContent = timeString;
-            
-            const totalCost = Object.values(services).reduce((acc, s) => acc + (s.instances * s.def.cost), 0);
-            totalCostEl.textContent = `$${totalCost.toFixed(2)}`;
-            incomingRPSEl.textContent = Math.round(rps);
+    function updateJourneyChart() {
+        if (!lastCompletedCheckoutJourney) return;
+        charts.journey.data.labels = lastCompletedCheckoutJourney.map(s => s.service);
+        charts.journey.data.datasets[0].data = lastCompletedCheckoutJourney.map(s => s.queueTime);
+        charts.journey.data.datasets[1].data = lastCompletedCheckoutJourney.map(s => s.processingTime);
+        charts.journey.update();
+        lastCompletedCheckoutJourney = null;
+    }
 
-            Object.values(services).forEach(service => service.updateUI());
-            
-            if (simTimeSeconds % 1 < 1 / TICKS_PER_SECOND) {
-                const p95Checkout = getP95CheckoutLatency();
-                Object.values(charts).forEach(chart => {
-                    chart.data.labels.push(timeString);
-                    if (chart.data.labels.length > 100) chart.data.labels.shift();
-                });
-                charts.rps.data.datasets[0].data.push(rps);
-                charts.latency.data.datasets[0].data.push(p95Checkout);
-                charts.cost.data.datasets[0].data.push(totalCost);
-                Object.values(charts).forEach(chart => {
-                    if (chart.data.datasets[0].data.length > 100) chart.data.datasets[0].data.shift();
-                    chart.update();
-                });
+    function logEvent(message, colorClass = 'text-gray-300') {
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${colorClass}`;
+        entry.innerHTML = `<span class="text-gray-500">${new Date(simTimeSeconds * 1000).toISOString().substr(11, 8)} |</span> ${message}`;
+        logContainer.prepend(entry);
+        if (logContainer.children.length > 100) logContainer.lastChild.remove();
+    }
+
+    // --- SCENARIO FUNCTIONS ---
+    const typicalDayScenario = time => 0.5 * Math.sin((time / (24 * 60)) * 2 * Math.PI - Math.PI / 2) + 1.5;
+    function flashSaleScenario(time) {
+        const saleStart = 30, saleDuration = 180, peakFactor = 10;
+        if (time > saleStart && time < saleStart + saleDuration) {
+            const timeIntoSale = time - saleStart;
+            return peakFactor - Math.pow(timeIntoSale - saleDuration / 2, 2) * (peakFactor - 1) / Math.pow(saleDuration / 2, 2);
+        }
+        return 1;
+    }
+
+    // --- DRAG AND DROP ---
+    function addDragFunctionality() {
+        let draggedItem = null, offsetX, offsetY;
+        servicesContainer.addEventListener('mousedown', e => {
+            const target = e.target.closest('.service-box');
+            if (target) {
+                draggedItem = target;
+                draggedItem.classList.add('dragging');
+                offsetX = e.clientX - draggedItem.getBoundingClientRect().left;
+                offsetY = e.clientY - draggedItem.getBoundingClientRect().top;
             }
-        }
-
-        function logEvent(message, colorClass = 'text-gray-300') {
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${colorClass}`;
-            entry.innerHTML = `<span class="text-gray-500">${simTimeEl.textContent} |</span> ${message}`;
-            logContainer.prepend(entry);
-            if (logContainer.children.length > 50) logContainer.lastChild.remove();
-        }
-
-        function startSimulation() {
-            if (simulationInterval) return;
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            simulationInterval = setInterval(simulationTick, 1000 / TICKS_PER_SECOND);
-            logEvent('Simulation started.', 'text-blue-400');
-        }
-
-        function stopSimulation() {
-            clearInterval(simulationInterval);
-            simulationInterval = null;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            logEvent('Simulation stopped.', 'text-red-400');
-        }
-
-        function resetSimulation() {
-            stopSimulation();
-            simTimeSeconds = 0;
-            globalRequestId = 0;
-            completedCheckoutRequests = [];
-            initializeServices();
-            Object.values(charts).forEach(chart => {
-                chart.data.labels = [];
-                chart.data.datasets[0].data = [];
-                chart.update();
-            });
-            logContainer.innerHTML = '';
-            updateUI(0);
-        }
-
-        startBtn.addEventListener('click', startSimulation);
-        stopBtn.addEventListener('click', stopSimulation);
-
-        typicalDayBtn.addEventListener('click', () => {
-            resetSimulation();
-            currentScenario = typicalDayScenario;
-            logEvent('Scenario set to: Typical Day. Press Start.', 'text-green-400');
         });
-
-        flashSaleBtn.addEventListener('click', () => {
-            resetSimulation();
-            currentScenario = flashSaleScenario;
-            logEvent('Scenario set to: Flash Sale. Press Start.', 'text-purple-400');
+        document.addEventListener('mousemove', e => {
+            if (draggedItem) {
+                e.preventDefault();
+                const rect = servicesContainer.getBoundingClientRect();
+                let x = e.clientX - rect.left - offsetX;
+                let y = e.clientY - rect.top - offsetY;
+                draggedItem.style.left = `${Math.max(0, Math.min(x, rect.width - draggedItem.offsetWidth))}px`;
+                draggedItem.style.top = `${Math.max(0, Math.min(y, rect.height - draggedItem.offsetHeight))}px`;
+                drawFlowLines();
+            }
         });
+        document.addEventListener('mouseup', () => {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                draggedItem = null;
+            }
+        });
+    }
 
-        window.onload = () => {
-            initializeCharts();
-            initializeServices();
-            currentScenario = typicalDayScenario;
-            updateUI(0);
-            logEvent('Simulation ready. Select a scenario and press Start.');
-        };
+    // --- EVENT LISTENERS & INITIALIZATION ---
+    function startSimulation() {
+        if (simulationInterval) return;
+        startBtn.disabled = true; stopBtn.disabled = false;
+        simulationInterval = setInterval(simulationTick, 1000 / TICKS_PER_SECOND);
+        logEvent('Simulation started.', 'text-blue-400');
+    }
+    function stopSimulation() {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+        startBtn.disabled = false; stopBtn.disabled = true;
+        logEvent('Simulation stopped.', 'text-red-400');
+    }
+    function resetSimulation() {
+        stopSimulation();
+        simTimeSeconds = 0; globalRequestId = 0;
+        lastChartUpdateTime = 0;
+        completedCheckoutLatencies = []; lastCompletedCheckoutJourney = null;
+        initializeServices();
+        initializeCharts();
+        logContainer.innerHTML = '';
+        updateUI(0);
+    }
+
+    rpsSlider.addEventListener('input', e => document.getElementById('rpsValue').textContent = e.target.value);
+    document.querySelectorAll('.mix-slider').forEach(slider => {
+        slider.addEventListener('input', () => {
+            const sliders = [...document.querySelectorAll('.mix-slider')];
+            let total = sliders.reduce((acc, s) => acc + parseFloat(s.value), 0);
+            if (total > 100) {
+                const diff = total - 100;
+                const others = sliders.filter(s => s !== slider);
+                if (others.length > 0) {
+                    others.forEach(s => s.value = Math.max(0, s.value - diff / others.length));
+                }
+            }
+            total = sliders.reduce((acc, s) => acc + parseFloat(s.value), 0);
+            if (total > 0) {
+                const scale = 100 / total;
+                sliders.forEach(s => s.value *= scale);
+            }
+            document.getElementById('browserValue').textContent = `${Math.round(sliders[0].value)}%`;
+            document.getElementById('shopperValue').textContent = `${Math.round(sliders[1].value)}%`;
+            document.getElementById('buyerValue').textContent = `${Math.round(sliders[2].value)}%`;
+        });
+    });
+
+    document.getElementById('typicalDayBtn').addEventListener('click', () => { currentScenario = typicalDayScenario; logEvent('Scenario set: Typical Day.', 'text-green-400'); });
+    document.getElementById('flashSaleBtn').addEventListener('click', () => { currentScenario = flashSaleScenario; logEvent('Scenario set: Flash Sale.', 'text-purple-400'); });
+    startBtn.addEventListener('click', startSimulation);
+    stopBtn.addEventListener('click', stopSimulation);
+
+    window.onload = () => { resetSimulation(); logEvent('Simulation ready. Adjust controls and press Start.'); };
+    window.onresize = () => drawFlowLines();
     </script>
 </body>
 </html>
