@@ -12,15 +12,24 @@
             font-family: 'Inter', sans-serif;
         }
         .service-box {
-            transition: box-shadow 0.2s ease-in-out;
+            transition: all 0.2s ease-in-out;
             z-index: 10;
             position: absolute;
             cursor: grab;
+            border: 2px solid transparent;
         }
         .service-box.dragging {
             cursor: grabbing;
             z-index: 20;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 2px #3b82f6;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .service-box.bottleneck {
+            border-color: #ef4444;
+            animation: pulse-border 1.5s infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
         }
         .instance {
             transition: all 0.3s ease-in-out;
@@ -31,34 +40,30 @@
         .instance.idle { background-color: #22c55e; } /* green-500 */
         .instance.scaling-up { animation: scale-up 0.5s ease-out; }
         .instance.scaling-down { animation: scale-down 0.5s ease-out; }
-        @keyframes scale-up {
-            from { transform: scale(0); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        @keyframes scale-down {
-            from { transform: scale(1); opacity: 1; }
-            to { transform: scale(0); opacity: 0; }
-        }
+        @keyframes scale-up { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes scale-down { from { transform: scale(1); opacity: 1; } to { transform: scale(0); opacity: 0; } }
         .log-entry { animation: fade-in 0.5s ease-out; }
-        @keyframes fade-in {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .flow-line {
             stroke-width: 3;
             fill: none;
-            marker-end: url(#arrowhead);
             transition: d 0.1s linear;
         }
         /* Custom slider styles */
         input[type=range] { -webkit-appearance: none; background: transparent; }
         input[type=range]:focus { outline: none; }
-        input[type=range]::-webkit-slider-runnable-track {
-            height: 6px; cursor: pointer; background: #374151; border-radius: 3px;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
-            background: #3b82f6; cursor: pointer; margin-top: -5px;
+        input[type=range]::-webkit-slider-runnable-track { height: 6px; cursor: pointer; background: #374151; border-radius: 3px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #3b82f6; cursor: pointer; margin-top: -5px; }
+        .details-content { display: none; }
+        .service-box.open .details-content { display: block; }
+        .config-input {
+            background-color: #1f2937;
+            border: 1px solid #4b5563;
+            color: #d1d5db;
+            width: 50px;
+            text-align: right;
+            padding-right: 2px;
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -89,29 +94,14 @@
                     <div class="space-y-4">
                         <div>
                             <label for="rpsSlider" class="block text-sm font-medium">Base Requests per Second (RPS)</label>
-                            <div class="flex items-center space-x-2">
-                                <input id="rpsSlider" type="range" min="0" max="1500" value="50" class="w-full">
-                                <span id="rpsValue" class="font-mono text-cyan-400 w-12 text-center">50</span>
-                            </div>
+                            <div class="flex items-center space-x-2"><input id="rpsSlider" type="range" min="0" max="1500" value="50" class="w-full"><span id="rpsValue" class="font-mono text-cyan-400 w-12 text-center">50</span></div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium">Request Mix</label>
                             <div class="space-y-2 mt-2">
-                                <div class="flex items-center space-x-2">
-                                    <label for="browserSlider" class="w-20 text-green-400">Browsers:</label>
-                                    <input id="browserSlider" type="range" min="0" max="100" value="70" class="w-full mix-slider">
-                                    <span id="browserValue" class="font-mono text-green-400 w-12 text-center">70%</span>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <label for="shopperSlider" class="w-20 text-yellow-400">Shoppers:</label>
-                                    <input id="shopperSlider" type="range" min="0" max="100" value="25" class="w-full mix-slider">
-                                    <span id="shopperValue" class="font-mono text-yellow-400 w-12 text-center">25%</span>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <label for="buyerSlider" class="w-20 text-pink-400">Buyers:</label>
-                                    <input id="buyerSlider" type="range" min="0" max="100" value="5" class="w-full mix-slider">
-                                    <span id="buyerValue" class="font-mono text-pink-400 w-12 text-center">5%</span>
-                                </div>
+                                <div class="flex items-center space-x-2"><label for="browserSlider" class="w-20 text-green-400">Browsers:</label><input id="browserSlider" type="range" min="0" max="100" value="70" class="w-full mix-slider"><span id="browserValue" class="font-mono text-green-400 w-12 text-center">70%</span></div>
+                                <div class="flex items-center space-x-2"><label for="shopperSlider" class="w-20 text-yellow-400">Shoppers:</label><input id="shopperSlider" type="range" min="0" max="100" value="25" class="w-full mix-slider"><span id="shopperValue" class="font-mono text-yellow-400 w-12 text-center">25%</span></div>
+                                <div class="flex items-center space-x-2"><label for="buyerSlider" class="w-20 text-pink-400">Buyers:</label><input id="buyerSlider" type="range" min="0" max="100" value="5" class="w-full mix-slider"><span id="buyerValue" class="font-mono text-pink-400 w-12 text-center">5%</span></div>
                             </div>
                         </div>
                     </div>
@@ -125,10 +115,7 @@
                 </div>
 
                 <!-- Event Log -->
-                <div>
-                    <h2 class="text-2xl font-bold text-white mb-4">Event Log</h2>
-                    <div id="logContainer" class="bg-gray-800 p-4 rounded-lg shadow-lg h-96 overflow-y-auto font-mono text-sm"></div>
-                </div>
+                <div><h2 class="text-2xl font-bold text-white mb-4">Event Log</h2><div id="logContainer" class="bg-gray-800 p-4 rounded-lg shadow-lg h-96 overflow-y-auto font-mono text-sm"></div></div>
             </div>
 
             <!-- Right Column: Sim & Charts -->
@@ -148,37 +135,35 @@
                         <p id="incomingRPS" class="text-3xl font-bold text-cyan-400">0</p>
                     </div>
                 </div>
-                
-                <!-- Main Charts -->
+                 <!-- Main Charts -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">Incoming RPS Pattern</h3><canvas id="rpsChart"></canvas></div>
-                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">P95 Checkout Lead Time (ms)</h3><canvas id="latencyChart"></canvas></div>
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">End-to-End P95 Latency (ms)</h3><canvas id="latencyChart"></canvas></div>
                     <div class="bg-gray-800 p-4 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-gray-300 mb-2">Total Infrastructure Cost ($/hr)</h3><canvas id="costChart"></canvas></div>
                 </div>
 
                 <!-- Journey Breakdown Chart -->
                  <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-2">Last Checkout Request Journey Breakdown (ms)</h3>
+                    <h3 class="text-lg font-semibold text-gray-300 mb-2">Last Buyer Request Journey Breakdown (ms)</h3>
                     <canvas id="journeyChart" height="120"></canvas>
                 </div>
 
                 <!-- Microservices Visualization -->
                 <div>
                     <h2 class="text-2xl font-bold text-white mb-4">Microservice Workstations</h2>
-                    <div id="servicesContainerWrapper" class="relative h-[600px] bg-gray-800/20 rounded-lg">
-                        <div id="userIcon" class="absolute flex flex-col items-center" style="top: 2%; left: 45%; z-index: 5;">
+                    <div id="servicesContainerWrapper" class="relative h-[800px] bg-gray-800/20 rounded-lg">
+                        <div id="userIcon" class="absolute flex flex-col items-center cursor-grab" style="top: 2%; left: 45%; z-index: 15;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                             <span class="text-sm font-semibold text-blue-300">Users</span>
                         </div>
                         <svg id="svgCanvas" class="absolute w-full h-full" style="z-index: 1;">
-                            <defs><marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22c55e" /></marker>
-                            <marker id="arrowhead-yellow" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#facc15" /></marker>
-                            <marker id="arrowhead-pink" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#f472b6" /></marker>
+                            <defs>
+                                <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22c55e" /></marker>
+                                <marker id="arrowhead-yellow" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#facc15" /></marker>
+                                <marker id="arrowhead-pink" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#f472b6" /></marker>
                             </defs>
                         </svg>
-                        <div id="servicesContainer" class="relative w-full h-full">
-                            <!-- Service boxes will be positioned absolutely by JS -->
-                        </div>
+                        <div id="servicesContainer" class="relative w-full h-full"></div>
                     </div>
                 </div>
             </div>
@@ -204,57 +189,52 @@
     };
 
     const SERVICE_LAYOUT = {
-        'UserAuthentication': { top: '18%', left: '37.5%' },
-        'ProductCatalog': { top: '35%', left: '5%' },
-        'ShoppingCart': { top: '35%', left: '70%' },
-        'Inventory': { top: '55%', left: '5%' },
-        'Checkout': { top: '55%', left: '70%' },
-        'Payment': { top: '75%', left: '45%' },
-        'Order': { top: '75%', left: '70%' },
+        'UserAuthentication': { top: '15%', left: '37.5%' }, 'ProductCatalog': { top: '30%', left: '5%' },
+        'ShoppingCart': { top: '30%', left: '70%' }, 'Inventory': { top: '50%', left: '5%' },
+        'Checkout': { top: '50%', left: '70%' }, 'Payment': { top: '70%', left: '45%' }, 'Order': { top: '70%', left: '70%' },
     };
 
-    // --- GLOBAL STATE ---
     let simulationInterval, simTimeSeconds = 0, services = {}, globalRequestId = 0;
-    let lastCompletedCheckoutJourney = null, completedCheckoutLatencies = [];
+    let lastCompletedBuyerJourney = null;
+    let completedLatencies = { Browser: [], Shopper: [], Buyer: [] };
     let currentScenario = () => 1;
     let lastChartUpdateTime = 0;
 
+    // Faster scaling timers
     const TICKS_PER_SECOND = 5;
-    const SUSTAINED_PERIOD_SECONDS = { out: 30, in: 120, emergency: 10 };
+    const SUSTAINED_PERIOD_SECONDS = { out: 5, in: 20, emergency: 2 };
     const ROLLING_WINDOW_SIZE = 100;
 
-    // --- DOM ELEMENTS ---
     const startBtn = document.getElementById('startBtn'), stopBtn = document.getElementById('stopBtn');
     const servicesContainer = document.getElementById('servicesContainer');
     const logContainer = document.getElementById('logContainer');
-    const rpsSlider = document.getElementById('rpsSlider'), rpsValue = document.getElementById('rpsValue');
+    const rpsSlider = document.getElementById('rpsSlider');
     
-    // --- CHART SETUP ---
     let charts = {};
-    function createChart(ctx, label, color) {
+    function createChart(ctx, datasets) {
         return new Chart(ctx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: `${color}33`, borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }] },
-            options: { scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            data: { labels: [], datasets: datasets },
+            options: { scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } }, plugins: { legend: { labels: { color: '#d1d5db' } } } }
         });
     }
 
     function initializeCharts() {
         Object.values(charts).forEach(c => c.destroy());
-        charts.rps = createChart(document.getElementById('rpsChart').getContext('2d'), 'Incoming RPS', '#22d3ee');
-        charts.latency = createChart(document.getElementById('latencyChart').getContext('2d'), 'P95 Checkout Latency', '#f472b6');
-        charts.cost = createChart(document.getElementById('costChart').getContext('2d'), 'Total Cost ($/hr)', '#4ade80');
+        charts.rps = createChart(document.getElementById('rpsChart').getContext('2d'), [{ label: 'Incoming RPS', data: [], borderColor: '#22d3ee', backgroundColor: '#22d3ee33', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }]);
+        charts.latency = createChart(document.getElementById('latencyChart').getContext('2d'), [
+            { label: 'Browser P95', data: [], borderColor: '#22c55e', fill: false, borderWidth: 2, pointRadius: 0 },
+            { label: 'Shopper P95', data: [], borderColor: '#facc15', fill: false, borderWidth: 2, pointRadius: 0 },
+            { label: 'Buyer P95', data: [], borderColor: '#f472b6', fill: false, borderWidth: 2, pointRadius: 0 },
+        ]);
+        charts.cost = createChart(document.getElementById('costChart').getContext('2d'), [{ label: 'Total Cost ($/hr)', data: [], borderColor: '#4ade80', backgroundColor: '#4ade8033', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true }]);
         charts.journey = new Chart(document.getElementById('journeyChart').getContext('2d'), {
             type: 'bar',
-            data: { labels: [], datasets: [
-                { label: 'Queue Time (ms)', data: [], backgroundColor: '#facc15' },
-                { label: 'Processing Time (ms)', data: [], backgroundColor: '#3b82f6' }
-            ]},
-            options: { indexAxis: 'y', responsive: true, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'bottom' } } }
+            data: { labels: [], datasets: [{ label: 'Queue Time (ms)', data: [], backgroundColor: '#facc15' }, { label: 'Processing Time (ms)', data: [], backgroundColor: '#3b82f6' }] },
+            options: { indexAxis: 'y', responsive: true, scales: { x: { stacked: true, ticks: {color: '#d1d5db'} }, y: { stacked: true, ticks: {color: '#d1d5db'} } }, plugins: { legend: { position: 'bottom', labels: {color: '#d1d5db'} } } }
         });
     }
     
-    // --- SIMULATION CORE ---
     class Microservice {
         constructor(id, def) {
             this.id = id; this.def = def; this.instances = 1; this.queue = [];
@@ -270,27 +250,31 @@
             box.style.top = SERVICE_LAYOUT[this.id].top;
             box.style.left = SERVICE_LAYOUT[this.id].left;
             box.innerHTML = `
-                <h3 class="font-bold text-md text-white">${this.def.name}</h3>
-                <div class="mt-1 space-y-1 text-xs">
-                    <div class="flex justify-between"><span>Instances:</span> <span id="inst-${this.id}" class="font-semibold text-cyan-400">1</span></div>
-                    <div class="flex justify-between"><span>Queue:</span> <span id="q-${this.id}" class="font-semibold text-yellow-400">0</span></div>
-                    <div class="flex justify-between"><span>Utilization:</span> <span id="util-${this.id}" class="font-semibold text-purple-400">0%</span></div>
-                    <div class="flex justify-between"><span>P95 (ms):</span> <span id="p95-${this.id}" class="font-semibold text-pink-400">0</span></div>
-                    <div class="flex justify-between"><span>Avg. Proc. Time:</span> <span class="font-semibold text-gray-300">${this.def.s}ms</span></div>
+                <div class="flex justify-between items-center cursor-pointer" onclick="toggleServiceDetails('${this.id}')">
+                    <h3 class="font-bold text-md text-white">${this.def.name}</h3>
+                    <div class="flex items-center space-x-2">
+                        <span id="q-indicator-${this.id}" class="text-xs font-mono text-yellow-400">Q:0</span>
+                        <span id="inst-indicator-${this.id}" class="text-xs font-mono text-cyan-400">I:1</span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
                 </div>
-                <div class="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400 space-y-1">
-                    <div>Scale > <b>${this.def.scaleOutUtil * 100}%</b> Util</div>
-                    <div>Scale > <b>${this.def.emergencySlo}ms</b> P95</div>
-                </div>
-                <div id="viz-${this.id}" class="mt-2 flex flex-wrap gap-1"></div>`;
+                <div class="details-content mt-2 pt-2 border-t border-gray-600">
+                    <div class="space-y-1 text-xs">
+                        <div class="flex justify-between"><span>Utilization:</span> <span id="util-${this.id}" class="font-semibold text-purple-400">0%</span></div>
+                        <div class="flex justify-between"><span>P95 (ms):</span> <span id="p95-${this.id}" class="font-semibold text-pink-400">0</span></div>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-400 space-y-2">
+                        <div class="flex justify-between items-center"><span>Avg. Proc. (ms):</span> <input type="number" step="1" id="s-cfg-${this.id}" class="config-input" value="${this.def.s}" onchange="updateConfig('${this.id}', 's', this.value)"></div>
+                        <div class="flex justify-between items-center"><span>Scale > Util (%):</span> <input type="number" step="1" id="util-cfg-${this.id}" class="config-input" value="${this.def.scaleOutUtil * 100}" onchange="updateConfig('${this.id}', 'scaleOutUtil', this.value / 100)"></div>
+                        <div class="flex justify-between items-center"><span>Scale > P95 (ms):</span> <input type="number" step="1" id="slo-cfg-${this.id}" class="config-input" value="${this.def.emergencySlo}" onchange="updateConfig('${this.id}', 'emergencySlo', this.value)"></div>
+                    </div>
+                    <div id="viz-${this.id}" class="mt-2 flex flex-wrap gap-1"></div>
+                </div>`;
             servicesContainer.appendChild(box);
             this.updateInstanceViz();
         }
 
-        enqueue(request) {
-            request.queueEntryTime = simTimeSeconds;
-            this.queue.push(request);
-        }
+        enqueue(request) { request.queueEntryTime = simTimeSeconds; this.queue.push(request); }
 
         tick() {
             this.processing = this.processing.filter(p => {
@@ -323,11 +307,13 @@
             request.path.shift();
             if (request.path.length > 0) {
                 services[request.path[0]].enqueue(request);
-            } else if (request.type === 'StartCheckout') {
+            } else {
                 const totalTime = (simTimeSeconds - request.startTime) * 1000;
-                completedCheckoutLatencies.push(totalTime);
-                if (completedCheckoutLatencies.length > ROLLING_WINDOW_SIZE) completedCheckoutLatencies.shift();
-                lastCompletedCheckoutJourney = request.journey;
+                completedLatencies[request.category].push(totalTime);
+                if (completedLatencies[request.category].length > ROLLING_WINDOW_SIZE) completedLatencies[request.category].shift();
+                if (request.category === 'Buyer') {
+                    lastCompletedBuyerJourney = request.journey;
+                }
             }
         }
 
@@ -349,7 +335,7 @@
             if (this.utilization > this.def.scaleOutUtil) {
                 this.utilOutTimer += 1;
                 if (this.utilOutTimer >= SUSTAINED_PERIOD_SECONDS.out * TICKS_PER_SECOND) {
-                    this.scaleOut(`Utilization ${(this.utilization*100).toFixed(0)}% > ${(this.def.scaleOutUtil*100)}%`);
+                    this.scaleOut(`Utilization ${(this.utilization*100).toFixed(0)}% > ${this.def.scaleOutUtil*100}%`);
                     this.utilOutTimer = 0;
                 }
             } else { this.utilOutTimer = 0; }
@@ -357,7 +343,7 @@
             if (this.utilization < this.def.scaleInUtil && this.instances > 1) {
                 this.utilInTimer += 1;
                 if (this.utilInTimer >= SUSTAINED_PERIOD_SECONDS.in * TICKS_PER_SECOND) {
-                    this.scaleIn(`Utilization ${(this.utilization*100).toFixed(0)}% < ${(this.def.scaleInUtil*100)}%`);
+                    this.scaleIn(`Utilization ${(this.utilization*100).toFixed(0)}% < ${this.def.scaleInUtil*100}%`);
                     this.utilInTimer = 0;
                 }
             } else { this.utilInTimer = 0; }
@@ -377,8 +363,8 @@
         }
 
         updateUI() {
-            document.getElementById(`inst-${this.id}`).textContent = this.instances;
-            document.getElementById(`q-${this.id}`).textContent = this.queue.length;
+            document.getElementById(`inst-indicator-${this.id}`).textContent = `I:${this.instances}`;
+            document.getElementById(`q-indicator-${this.id}`).textContent = `Q:${this.queue.length}`;
             document.getElementById(`util-${this.id}`).textContent = `${(this.utilization * 100).toFixed(1)}%`;
             const p95El = document.getElementById(`p95-${this.id}`);
             p95El.textContent = this.p95.toFixed(0);
@@ -425,9 +411,8 @@
     
     function drawFlowLines() {
         const svg = document.getElementById('svgCanvas');
-        svg.innerHTML = svg.querySelector('defs').outerHTML; // Clear lines but keep defs
+        svg.innerHTML = svg.querySelector('defs').outerHTML;
 
-        // Line from user icon to auth service
         const userIcon = document.getElementById('userIcon');
         const authService = document.getElementById('service-UserAuthentication');
         if (userIcon && authService) {
@@ -440,7 +425,7 @@
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
             path.setAttribute('class', 'flow-line');
-            path.style.stroke = '#a78bfa'; // purple-400
+            path.style.stroke = '#a78bfa';
             svg.appendChild(path);
         }
         
@@ -455,22 +440,16 @@
                     const toRect = { top: toEl.offsetTop, left: toEl.offsetLeft, width: toEl.offsetWidth, height: toEl.offsetHeight };
                     
                     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    const x1 = fromRect.left + fromRect.width / 2;
-                    const y1 = fromRect.top + fromRect.height / 2;
-                    const x2 = toRect.left + toRect.width / 2;
-                    const y2 = toRect.top + toRect.height / 2;
+                    const x1 = fromRect.left + fromRect.width / 2, y1 = fromRect.top + fromRect.height / 2;
+                    const x2 = toRect.left + toRect.width / 2, y2 = toRect.top + toRect.height / 2;
 
-                    // Offset for parallel lines
-                    const angle = Math.atan2(y2 - y1, x2 - x1);
-                    const perpAngle = angle + Math.PI / 2;
+                    const angle = Math.atan2(y2 - y1, x2 - x1), perpAngle = angle + Math.PI / 2;
                     let offset = 0;
-                    if (cat.color === '#22c55e') offset = -6; // green
-                    if (cat.color === '#f472b6') offset = 6;  // pink
+                    if (cat.color === '#22c55e') offset = -6;
+                    if (cat.color === '#f472b6') offset = 6;
                     
-                    const ox1 = x1 + offset * Math.cos(perpAngle);
-                    const oy1 = y1 + offset * Math.sin(perpAngle);
-                    const ox2 = x2 + offset * Math.cos(perpAngle);
-                    const oy2 = y2 + offset * Math.sin(perpAngle);
+                    const ox1 = x1 + offset * Math.cos(perpAngle), oy1 = y1 + offset * Math.sin(perpAngle);
+                    const ox2 = x2 + offset * Math.cos(perpAngle), oy2 = y2 + offset * Math.sin(perpAngle);
 
                     path.setAttribute('d', `M ${ox1} ${oy1} L ${ox2} ${oy2}`);
                     path.setAttribute('class', 'flow-line');
@@ -482,7 +461,6 @@
         });
     }
 
-    // --- MAIN SIMULATION LOOP ---
     function simulationTick() {
         simTimeSeconds += 1 / TICKS_PER_SECOND;
         const baseRPS = parseFloat(rpsSlider.value);
@@ -499,7 +477,7 @@
             const requestType = catInfo.types[Math.floor(Math.random() * catInfo.types.length)];
             const path = [...catInfo.routing[requestType]];
             if (path.length > 0) {
-                services[path[0]].enqueue({ id: globalRequestId++, type: requestType, path, startTime: simTimeSeconds, journey: [] });
+                services[path[0]].enqueue({ id: globalRequestId++, type: requestType, category, path, startTime: simTimeSeconds, journey: [] });
             }
         }
         
@@ -513,17 +491,41 @@
         document.getElementById('totalCost').textContent = `$${Object.values(services).reduce((acc, s) => acc + (s.instances * s.def.cost), 0).toFixed(2)}`;
         document.getElementById('incomingRPS').textContent = Math.round(rps);
         Object.values(services).forEach(service => service.updateUI());
+
+        let maxQueue = -1;
+        let bottleneckService = null;
+        Object.values(services).forEach(s => {
+            document.getElementById(`service-${s.id}`).classList.remove('bottleneck');
+            if(s.queue.length > maxQueue) {
+                maxQueue = s.queue.length;
+                bottleneckService = s.id;
+            }
+        });
+        if(bottleneckService && maxQueue > 5) {
+             document.getElementById(`service-${bottleneckService}`).classList.add('bottleneck');
+        }
         
         if (simTimeSeconds - lastChartUpdateTime >= 1) {
-            const p95 = completedCheckoutLatencies.length < 10 ? 0 : [...completedCheckoutLatencies].sort((a,b)=>a-b)[Math.floor(completedCheckoutLatencies.length * 0.95)-1];
+            const p95s = {
+                Browser: getP95ForCategory('Browser'),
+                Shopper: getP95ForCategory('Shopper'),
+                Buyer: getP95ForCategory('Buyer')
+            };
             updateChart(charts.rps, timeString, rps);
-            updateChart(charts.latency, timeString, p95);
+            updateLatencyChart(timeString, p95s);
             updateChart(charts.cost, timeString, parseFloat(document.getElementById('totalCost').textContent.substring(1)));
             updateJourneyChart();
             lastChartUpdateTime = simTimeSeconds;
         }
     }
     
+    function getP95ForCategory(category) {
+        const latencies = completedLatencies[category];
+        if (latencies.length < 10) return 0;
+        const sorted = [...latencies].sort((a,b)=>a-b);
+        return sorted[Math.floor(latencies.length * 0.95)-1];
+    }
+
     function updateChart(chart, label, data) {
         if (!chart || !chart.data) return;
         chart.data.labels.push(label);
@@ -535,13 +537,27 @@
         chart.update();
     }
 
+    function updateLatencyChart(label, p95s) {
+        const chart = charts.latency;
+        if (!chart || !chart.data) return;
+        chart.data.labels.push(label);
+        chart.data.datasets[0].data.push(p95s.Browser);
+        chart.data.datasets[1].data.push(p95s.Shopper);
+        chart.data.datasets[2].data.push(p95s.Buyer);
+        if (chart.data.labels.length > 100) {
+            chart.data.labels.shift();
+            chart.data.datasets.forEach(ds => ds.data.shift());
+        }
+        chart.update();
+    }
+
     function updateJourneyChart() {
-        if (!lastCompletedCheckoutJourney) return;
-        charts.journey.data.labels = lastCompletedCheckoutJourney.map(s => s.service);
-        charts.journey.data.datasets[0].data = lastCompletedCheckoutJourney.map(s => s.queueTime);
-        charts.journey.data.datasets[1].data = lastCompletedCheckoutJourney.map(s => s.processingTime);
+        if (!lastCompletedBuyerJourney) return;
+        charts.journey.data.labels = lastCompletedBuyerJourney.map(s => s.service);
+        charts.journey.data.datasets[0].data = lastCompletedBuyerJourney.map(s => s.queueTime);
+        charts.journey.data.datasets[1].data = lastCompletedBuyerJourney.map(s => s.processingTime);
         charts.journey.update();
-        lastCompletedCheckoutJourney = null;
+        lastCompletedBuyerJourney = null;
     }
 
     function logEvent(message, colorClass = 'text-gray-300') {
@@ -552,8 +568,7 @@
         if (logContainer.children.length > 100) logContainer.lastChild.remove();
     }
 
-    // --- SCENARIO FUNCTIONS ---
-    const typicalDayScenario = time => 0.5 * Math.sin((time / (24 * 60)) * 2 * Math.PI - Math.PI / 2) + 1.5;
+    const typicalDayScenario = time => (0.6 * Math.sin(time / 60) + 0.3 * Math.sin(time/20) + 1.2);
     function flashSaleScenario(time) {
         const saleStart = 30, saleDuration = 180, peakFactor = 10;
         if (time > saleStart && time < saleStart + saleDuration) {
@@ -563,11 +578,10 @@
         return 1;
     }
 
-    // --- DRAG AND DROP ---
     function addDragFunctionality() {
         let draggedItem = null, offsetX, offsetY;
-        servicesContainer.addEventListener('mousedown', e => {
-            const target = e.target.closest('.service-box');
+        document.getElementById('servicesContainerWrapper').addEventListener('mousedown', e => {
+            const target = e.target.closest('.service-box, #userIcon');
             if (target) {
                 draggedItem = target;
                 draggedItem.classList.add('dragging');
@@ -594,7 +608,6 @@
         });
     }
 
-    // --- EVENT LISTENERS & INITIALIZATION ---
     function startSimulation() {
         if (simulationInterval) return;
         startBtn.disabled = true; stopBtn.disabled = false;
@@ -611,11 +624,23 @@
         stopSimulation();
         simTimeSeconds = 0; globalRequestId = 0;
         lastChartUpdateTime = 0;
-        completedCheckoutLatencies = []; lastCompletedCheckoutJourney = null;
+        completedLatencies = { Browser: [], Shopper: [], Buyer: [] };
+        lastCompletedBuyerJourney = null;
         initializeServices();
         initializeCharts();
         logContainer.innerHTML = '';
         updateUI(0);
+    }
+
+    function toggleServiceDetails(serviceId) {
+        document.getElementById(`service-${serviceId}`).classList.toggle('open');
+    }
+    function updateConfig(serviceId, key, value) {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue)) {
+            SERVICE_DEFINITIONS[serviceId][key] = numValue;
+            logEvent(`Updated ${services[serviceId].def.name} ${key} to ${value}.`, 'text-blue-300');
+        }
     }
 
     rpsSlider.addEventListener('input', e => document.getElementById('rpsValue').textContent = e.target.value);
@@ -626,15 +651,10 @@
             if (total > 100) {
                 const diff = total - 100;
                 const others = sliders.filter(s => s !== slider);
-                if (others.length > 0) {
-                    others.forEach(s => s.value = Math.max(0, s.value - diff / others.length));
-                }
+                if (others.length > 0) { others.forEach(s => s.value = Math.max(0, s.value - diff / others.length)); }
             }
             total = sliders.reduce((acc, s) => acc + parseFloat(s.value), 0);
-            if (total > 0) {
-                const scale = 100 / total;
-                sliders.forEach(s => s.value *= scale);
-            }
+            if (total > 0) { const scale = 100 / total; sliders.forEach(s => s.value *= scale); }
             document.getElementById('browserValue').textContent = `${Math.round(sliders[0].value)}%`;
             document.getElementById('shopperValue').textContent = `${Math.round(sliders[1].value)}%`;
             document.getElementById('buyerValue').textContent = `${Math.round(sliders[2].value)}%`;
